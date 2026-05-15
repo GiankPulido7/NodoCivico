@@ -1,0 +1,341 @@
+# Explicación Completa de la Aplicación NodoCivico
+
+## ¿Qué es NodoCivico?
+
+Es una aplicación Android para reportar problemas comunitarios (baches, luces dañadas,
+basura, etc.). Permite a los ciudadanos crear reportes, ver el estado de los mismos, y
+gestionar su perfil.
+
+---
+
+## Estructura de Carpetas y Archivos
+
+app/src/main/
+├── java/com/nodocivico/
+│   ├── activities/
+│   │   └── MainActivity.java          ← Actividad principal (contenedor de navegación)
+│   ├── fragments/
+│   │   ├── SplashFragment.java        ← Pantalla de inicio (logo)
+│   │   ├── LoginFragment.java         ← Inicio de sesión
+│   │   ├── HomeFragment.java          ← Menú principal
+│   │   ├── CreateReportFragment.java  ← Crear nuevo reporte
+│   │   ├── ReportListFragment.java   ← Lista de reportes
+│   │   ├── ProfileFragment.java       ← Perfil del usuario
+│   │   └── SettingsFragment.java      ← Configuración
+│   ├── models/
+│   │   ├── User.java                  ← Modelo de usuario
+│   │   ├── Report.java                 ← Modelo de reporte
+│   │   └── Category.java               ← Modelo de categoría
+│   ├── repository/
+│   │   └── ReportRepository.java       ← Repositorio de reportes (preparado para Room)
+│   ├── network/
+│   │   ├── ApiClient.java             ← Cliente Retrofit (para API)
+│   │   └── ApiService.java            ← Definición de endpoints REST
+│   ├── adapters/
+│   │   └── ReportAdapter.java         ← Adapter para RecyclerView
+│   └── utils/
+│       └── ValidationUtils.java        ← Utilidades de validación
+├── res/
+│   ├── layout/                        ← Archivos XML de interfaz
+│   │   ├── activity_main.xml
+│   │   ├── fragment_*.xml
+│   │   └── item_report.xml
+│   ├── navigation/
+│   │   └── nav_graph.xml             ← Gráfico de navegación
+│   └── values/
+│       ├── colors.xml                ← Colores del app
+│       ├── strings.xml               ← Textos
+│       └── themes.xml                ← Temas
+└── AndroidManifest.xml
+
+---
+
+## Cómo Funciona la Aplicación
+
+### 1. Navegación entre Vistas (Navigation Component + NavHostFragment)
+
+La navegación se configura en nav_graph.xml:
+
+SplashFragment → LoginFragment → HomeFragment
+                                        ├── ReportListFragment
+                                        ├── CreateReportFragment
+                                        ├── ProfileFragment
+                                        └── SettingsFragment
+
+¿Cómo se comunican las vistas?
+- MainActivity.java contiene el NavHostFragment que carga el gráfico de navegación
+- Los fragmentos usan Navigation.findNavController(view).navigate(R.id.action_...)
+  para navegar
+- ViewBinding conecta los layouts XML con el código Java
+
+Ejemplo en HomeFragment.java (líneas 37-52):
+```java
+binding.cardReports.setOnClickListener(v ->
+    Navigation.findNavController(view).navigate(R.id.action_homeFragment_to_reportListFragment));
+```
+
+---
+
+### 2. Ingreso a la App (Usuario y Contraseña) - LoginFragment.java
+
+El sistema actual valida localmente (NO conecta a un servidor):
+
+Validaciones que hace:
+1. Campos vacíos → Muestra error "El correo/contraseña es requerido"
+2. Formato de email → Debe ser válido (contiene @ y dominio)
+3. Longitud de contraseña → Mínimo 6 caracteres
+
+Código (líneas 39-73):
+```java
+private void validateLogin(View view) {
+    String email = binding.etEmail.getText().toString().trim();
+    String password = binding.etPassword.getText().toString().trim();
+
+    // Validar campos vacíos
+    if (TextUtils.isEmpty(email)) {
+        binding.tilEmail.setError("El correo es requerido");
+        return;
+    }
+
+    // Validar formato email
+    if (!android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
+        binding.tilEmail.setError("Ingrese un correo válido");
+        return;
+    }
+
+    // Validar contraseña mínima
+    if (password.length() < 6) {
+        binding.tilPassword.setError("La contraseña debe tener al menos 6 caracteres");
+        return;
+    }
+
+    // Login exitoso → navegar a Home
+    Toast.makeText(requireContext(), "Bienvenido a Nodo Cívico", Toast.LENGTH_SHORT).show();
+    Navigation.findNavController(view).navigate(R.id.action_loginFragment_to_homeFragment);
+}
+```
+
+Nota importante: El login actual es falso - acepta cualquier email válido con contraseña de
+6+ caracteres.
+
+---
+
+### 3. Perfil del Usuario - ProfileFragment.java
+
+Muestra información del usuario logueado:
+
+Datos que muestra:
+- Nombre: "Juan Pérez"
+- Email: "juan.perez@email.com"
+- Rol: "Coordinador Vecinal"
+
+Código (líneas 42-49):
+```java
+private void loadUserData() {
+    // Crear usuario de ejemplo (simulado)
+    currentUser = new User(1, "Juan Pérez", "juan.perez@email.com", "Coordinador Vecinal");
+
+    // Mostrar en la vista
+    binding.tvUserName.setText(currentUser.getName());
+    binding.tvUserEmail.setText(currentUser.getEmail());
+    binding.tvUserRole.setText(currentUser.getRole());
+}
+```
+
+Dónde se ve: En fragment_profile.xml hay TextViews con IDs tvUserName, tvUserEmail,
+tvUserRole.
+
+---
+
+### 4. Crear Reporte - CreateReportFragment.java
+
+Permite crear reportes con:
+- Título (campo obligatorio)
+- Descripción (mínimo 20 caracteres)
+- Categoría (Spinner con opciones)
+- Prioridad (Spinner con opciones)
+
+Categorías disponibles (línea 25):
+```java
+private String[] categories = {"Infraestructura", "Servicios Públicos", "Limpieza",
+"Medio Ambiente", "Seguridad"};
+```
+
+Prioridades disponibles (línea 26):
+```java
+private String[] priorities = {"Baja", "Media", "Alta"};
+```
+
+Al crear un reporte, el estado inicial es "Pendiente" (línea 49 en ReportRepository.java):
+```java
+report.setStatus("Pendiente");
+```
+
+---
+
+### 5. Estados de los Reportes
+
+Los reportes pueden tener 3 estados (definidos en Report.java línea 13 y ReportAdapter.java):
+
+| Estado      | Color (#F57C00) | Significado                    |
+|-------------|-----------------|--------------------------------|
+| Pendiente   | Naranja         | Reporte nuevo, sin atender     |
+| En proceso  | Azul            | Estan trabajando en ello       |
+| Resuelto    | Verde           | Ya se solucionó                |
+
+Prioridades:
+
+| Prioridad | Color        | Significado   |
+|-----------|--------------|---------------|
+| Alta      | Rojo         | Urgente       |
+| Media     | Amarillo     | Normal        |
+| Baja      | Verde        | Puede esperar |
+
+Ejemplo de datos en ReportListFragment (líneas 55-59):
+```java
+reportList.add(new Report(1, "Bache en calle principal", "...", "Infraestructura",
+"Alta", "Pendiente"));
+reportList.add(new Report(2, "Luz callejera dañada", "...", "Servicios Públicos",
+"Media", "En proceso"));
+reportList.add(new Report(3, "Basura acumulada", "...", "Limpieza", "Baja", "Resuelto"));
+```
+
+---
+
+### 6. Lista de Reportes - ReportListFragment.java + ReportAdapter.java
+
+Usa RecyclerView para mostrar la lista de reportes.
+
+Flujo:
+1. ReportListFragment crea una lista de objetos Report
+2. Pasa la lista al ReportAdapter
+3. El Adapter usa onBindViewHolder() para renderizar cada item
+4. Cada item muestra: título, descripción, categoría, prioridad y estado
+
+Código del Adapter (líneas 61-78):
+```java
+public void bind(Report report) {
+    binding.tvReportTitle.setText(report.getTitle());
+    binding.tvReportCategory.setText(report.getCategory());
+    binding.tvReportPriority.setText(report.getPriority());
+    binding.tvReportStatus.setText(report.getStatus());
+
+    // Aplica colores según estado y prioridad
+    int statusColor = getStatusColor(report.getStatus());
+    binding.tvReportStatus.setTextColor(statusColor);
+
+    int priorityColor = getPriorityColor(report.getPriority());
+    binding.tvReportPriority.setTextColor(priorityColor);
+}
+```
+
+---
+
+### 7. Guardado de Datos
+
+Actualmente NO usa Room Database. Usa datos simulados (mock).
+
+ReportRepository.java (líneas 14-56):
+```java
+public class ReportRepository {
+    private static ReportRepository instance;
+    private final MutableLiveData<List<Report>> reportsLiveData;
+    private List<Report> cachedReports;
+
+    // Singleton
+    public static synchronized ReportRepository getInstance() {
+        if (instance == null) {
+            instance = new ReportRepository();
+        }
+        return instance;
+    }
+
+    // Obtener todos los reportes (simulado)
+    public LiveData<List<Report>> getAllReports() {
+        loadMockReports();  // Carga datos de ejemplo
+        reportsLiveData.setValue(cachedReports);
+        return reportsLiveData;
+    }
+
+    // Crear reporte (simulado)
+    public void createReport(Report report, OnReportCreatedListener listener) {
+        new android.os.Handler().postDelayed(() -> {
+            report.setId(cachedReports.size() + 1);
+            report.setStatus("Pendiente");  // ← Estado inicial
+            cachedReports.add(report);
+            reportsLiveData.postValue(cachedReports);
+            if (listener != null) {
+                listener.onSuccess(report);
+            }
+        }, 500);
+    }
+}
+```
+
+Qué falta para Room:
+1. Agregar dependencia de Room en build.gradle
+2. Crear clase AppDatabase con @Database
+3. Crear DAOs con @Dao
+4. Reemplazar cachedReports con operaciones de Room
+
+---
+
+### 8. Comunicación con Backend (preparado para API REST)
+
+Ya está configurado Retrofit para conectar con un servidor:
+
+ApiClient.java:
+```java
+private static final String BASE_URL = "https://api.nodocivico.com/";
+
+public static Retrofit getClient() {
+    retrofit = new Retrofit.Builder()
+            .baseUrl(BASE_URL)
+            .addConverterFactory(GsonConverterFactory.create())
+            .client(getOkHttpClient())
+            .build();
+    return retrofit;
+}
+```
+
+ApiService.java (endpoints definidos):
+```java
+// Login
+@POST("api/login")
+Call<User> login(@Body User user);
+
+// Reports
+@GET("api/reports")
+Call<List<Report>> getAllReports();
+
+@POST("api/reports")
+Call<Report> createReport(@Body Report report);
+
+@PUT("api/reports/{id}")
+Call<Report> updateReport(@Path("id") int reportId, @Body Report report);
+```
+
+---
+
+## Resumen para el Profesor
+
+| Aspecto       | Estado   | Explicación                                                  |
+|---------------|----------|--------------------------------------------------------------|
+| Navegación    | ✅ Listo | Navigation Component con NavHostFragment                   |
+| Login         | ✅ Parcial | Validación local, NO conecta a backend                     |
+| Crear Reporte | ✅ Parcial | Formulario con validaciones, guarda en memoria (NO en BD) |
+| Lista de Reportes | ✅ Listo | RecyclerView con Adapter                               |
+| Estados       | ✅ Listo | Pendiente / En proceso / Resuelto                           |
+| Perfil        | ✅ Simulado | Muestra datos hardcodeados                             |
+| Room Database | ❌ No implementado | Preparado en Repository, pero sin código          |
+| API REST      | ✅ Preparado | Retrofit configurado, esperando backend             |
+
+---
+
+## ¿Qué debes aprender/implementar para el próximo entregable?
+
+1. Room Database: Crear la base de datos local
+2. Conectar el Repository con Room: Reemplazar datos mock
+3. Implementar el Login real: Conectar a la API
+4. Guardar reportes en Room: Persistir datos localmente
+5. Actualizar estados: Poder cambiar Pendiente → En proceso → Resuelto

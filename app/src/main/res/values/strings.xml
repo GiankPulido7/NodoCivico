@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- App Name -->
+    <string name="app_name">Nodo Cívico</string>
+    <string name="tagline">Reportes vecinales al alcance</string>
+
+    <!-- Common -->
+    <string name="ok">Aceptar</string>
+    <string name="cancel">Cancelar</string>
+    <string name="save">Guardar</string>
+    <string name="delete">Eliminar</string>
+    <string name="edit">Editar</string>
+
+    <!-- Login -->
+    <string name="welcome_back">Bienvenido</string>
+    <string name="login_subtitle">Ingresa tus credenciales para continuar</string>
+    <string name="email">Correo electrónico</string>
+    <string name="password">Contraseña</string>
+    <string name="login">Ingresar</string>
+    <string name="forgot_password">¿Olvidaste tu contraseña?</string>
+
+    <!-- Home -->
+    <string name="home_greeting">¡Hola, Vecino!</string>
+    <string name="home_subtitle">¿Qué deseas hacer hoy?</string>
+    <string name="reports">Ver Reportes</string>
+    <string name="create_report">Crear Reporte</string>
+    <string name="profile">Perfil</string>
+    <string name="settings">Configuración</string>
+
+    <!-- Reports -->
+    <string name="report_list">Lista de Reportes</string>
+    <string name="report_title">Título del reporte</string>
+    <string name="report_description">Descripción del problema</string>
+    <string name="category">Categoría</string>
+    <string name="priority">Prioridad</string>
+    <string name="status">Estado</string>
+    <string name="save_report">Guardar Reporte</string>
+    <string name="no_reports">No hay reportes disponibles</string>
+
+    <!-- Profile -->
+    <string name="role_label">Rol Comunitario</string>
+
+    <!-- Settings -->
+    <string name="notifications_section">NOTIFICACIONES</string>
+    <string name="notifications">Notificaciones push</string>
+    <string name="notifications_desc">Recibir alertas de nuevos reportes</string>
+    <string name="data_section">DATOS</string>
+    <string name="offline_mode">Modo offline</string>
+    <string name="offline_mode_desc">Guardar datos sin conexión</string>
+    <string name="account_section">CUENTA</string>
+    <string name="logout">Cerrar sesión</string>
+    <string name="version">Versión 1.0.0</string>
+</resources>
